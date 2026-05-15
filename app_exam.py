@@ -13,8 +13,8 @@ from datetime import datetime
 # 1. 網頁頁面配置
 # ==========================================
 st.set_page_config(page_title="段考監考終極自動化", page_icon="🏫", layout="wide")
-st.title("🏫 試務組-段考監考全自動化系統 (雷達精準版)")
-st.info("💡 終極修復：已為班級雷達加裝「字數過濾器」，防止將標題誤認為班級！保證 100% 絕對不會再覆蓋到日期與節次。")
+st.title("🏫 試務組-段考監考全自動化系統 (格式保護版)")
+st.info("💡 核心更新：已修復 Pandas 將節次讀取為 1.0 的浮點數問題！現在雷達能 100% 精準抓到節次列了！")
 
 # --- 初始化狀態 ---
 if 'results' not in st.session_state:
@@ -137,19 +137,16 @@ if st.button("🚀 啟動終極全自動排班系統", type="primary", use_conta
             assign_start_idx = -1
             class_keywords = ['商', '國', '電', '資', '廣', '美', '應', '觀', '高', '普', '體']
             
-            # 往下掃描尋找真正的「班級」
             for r in range(len(df_assign_temp)):
                 v = str(df_assign_temp.iloc[r, 0]).strip()
-                # 關鍵防呆：長度必須小於等於8，防止把「國立華南高商」標題當成班級！
                 if len(v) <= 8 and any(v.startswith(k) for k in class_keywords) and any(c in v for c in ['一', '二', '三', 'ㄧ']):
                     assign_start_idx = r
                     break
             
             if assign_start_idx == -1:
-                st.error("🚨 找不到班級起始位置！請確保上傳的是『乾淨的空白範本』，且班級列沒有被覆蓋。")
+                st.error("🚨 找不到班級起始位置！請確保上傳的是『乾淨的空白範本』。")
                 st.stop()
 
-            # 抓取班級清單 (略過空白與備註列)
             class_names_raw = []
             for r in range(assign_start_idx, len(df_assign_temp)):
                 v = str(df_assign_temp.iloc[r, 0]).strip()
@@ -159,19 +156,22 @@ if st.button("🚀 啟動終極全自動排班系統", type="primary", use_conta
             norm_class_names = [clean_str(c) for c in class_names_raw]
             assign_map = {name: idx for idx, name in enumerate(norm_class_names)}
             
-            # 【往上掃描】精準尋找節次欄位 (1-5, 1-5)
+            # 【往上掃描】精準尋找節次欄位 (破解 Pandas 1.0 魔咒)
             periods_row_idx = -1
             day1_cols, day2_cols = [], []
             for r in range(assign_start_idx - 1, -1, -1):
-                row_vals = [str(x).strip() for x in df_assign_temp.iloc[r, :].tolist()]
-                # 若該列包含多個節次數字，即判定為節次列
+                row_vals = []
+                for x in df_assign_temp.iloc[r, :].tolist():
+                    v = str(x).strip()
+                    if v.endswith('.0'): v = v[:-2] # 強制把 1.0 變回 1
+                    row_vals.append(v)
+                
                 if '1' in row_vals and '2' in row_vals and '3' in row_vals:
                     periods_row_idx = r
                     day_cursor = 1
                     for c_idx, val in enumerate(row_vals):
-                        s_val = val
-                        if s_val in ['1', '2', '3', '4', '5']:
-                            if s_val == '1' and len(day1_cols) >= 5: day_cursor = 2
+                        if val in ['1', '2', '3', '4', '5']:
+                            if val == '1' and len(day1_cols) >= 5: day_cursor = 2
                             if day_cursor == 1: day1_cols.append(c_idx)
                             else: day2_cols.append(c_idx)
                     break
@@ -182,7 +182,6 @@ if st.button("🚀 啟動終極全自動排班系統", type="primary", use_conta
                 
             target_cols = day1_cols[:5] + day2_cols[:5]
 
-            # 抓取日期
             date_row_idx = max(0, periods_row_idx - 1)
             sys_d1_raw = str(df_assign_temp.iloc[date_row_idx, target_cols[0]])
             sys_d2_raw = str(df_assign_temp.iloc[date_row_idx, target_cols[5]])
@@ -267,14 +266,13 @@ if st.button("🚀 啟動終極全自動排班系統", type="primary", use_conta
                         random.shuffle(avail)
                         for idx, p in zip(range(len(class_names_raw)), avail): assigned_matrix[idx, curr_j] = p
 
-            # --- 5. 寫入【監考一覽表】(使用 openpyxl 絕對保護標題) ---
+            # --- 5. 寫入【監考一覽表】 ---
             with st.spinner("🖨️ 正在將班級分配無縫套入一覽表範本..."):
                 wb_assign = openpyxl.load_workbook(file_assign)
                 ws_assign = wb_assign.active
                 
-                # 精準填寫老師，完全避開標題列的合併儲存格
                 for r_idx in range(len(class_names_raw)):
-                    target_r = assign_start_idx + r_idx + 1 # Excel 是 1-based
+                    target_r = assign_start_idx + r_idx + 1 
                     for c_idx in range(10):
                         p_name = assigned_matrix[r_idx, c_idx]
                         if p_name:
@@ -414,7 +412,7 @@ if st.button("🚀 啟動終極全自動排班系統", type="primary", use_conta
                 'pub': pub_bytes,
                 'label': label_bytes
             }
-            st.success("🎉 完美防當機版合成完畢！雷達已精準避開大標題，完美保護您的日期與節次！")
+            st.success("🎉 完美防當機版合成完畢！現在系統已經能無視 Pandas 小數點問題，精準套用原檔案格式了！")
 
         except Exception as e:
             st.error(f"發生錯誤: {e}")
