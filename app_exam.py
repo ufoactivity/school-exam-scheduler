@@ -14,7 +14,7 @@ from datetime import datetime
 # ==========================================
 st.set_page_config(page_title="段考監考終極自動化", page_icon="🏫", layout="wide")
 st.title("🏫 試務組-段考監考全自動化系統 (終極完全體)")
-st.info("💡 終極修復：已修正總表符號消失與按鈕遺漏問題！全新「多檔動態雷達」能完美融合 5/13 手排與 5/14~15 AI 排班，所有格式 100% 保留。")
+st.info("💡 終極修復：已解除「監考類型總數」的雷達綁定，解決 index out of bounds 錯誤！現在系統能完美區分靜態數據與動態報表。")
 
 # --- 初始化狀態 ---
 if 'results' not in st.session_state:
@@ -122,8 +122,7 @@ if st.button("🚀 啟動終極全自動排班系統", type="primary", use_conta
         st.error("🚨 請確認必要排考基礎檔案【1, 2, 3, 5】皆已上傳！")
     else:
         try:
-            # --- 1. 動態偵測各檔案的 10 個 AI 節次欄位 ---
-            df_type = pd.read_excel(file_type, header=None).fillna("")
+            # --- 1. 動態偵測 名單與一覽表 的 AI 節次欄位 ---
             df_list_raw = pd.read_excel(file_list, header=None).fillna("")
             df_assign_temp = pd.read_excel(file_assign, header=None).fillna("")
 
@@ -141,7 +140,6 @@ if st.button("🚀 啟動終極全自動排班系統", type="primary", use_conta
                         return day1[:5] + day2[:5], r
                 return list(range(3, 13)), 2
 
-            type_cols, _ = find_ai_10_cols(df_type)
             list_cols, list_header_r = find_ai_10_cols(df_list_raw)
             assign_cols, assign_periods_r = find_ai_10_cols(df_assign_temp)
 
@@ -149,11 +147,13 @@ if st.button("🚀 啟動終極全自動排班系統", type="primary", use_conta
             df_quota = pd.read_excel(file_quota, sheet_name=selected_sheet).fillna("")
             quota_dict = dict(zip(df_quota.iloc[:, 0].astype(str).str.strip(), pd.to_numeric(df_quota.iloc[:, 1], errors='coerce').fillna(0)))
 
+            # 【重點修復】：恢復 3 號檔案「監考類型總數」的穩定讀取法
+            df_type = pd.read_excel(file_type, header=None).fillna("")
             req_matrix = {'△': [0]*10, '※': [0]*10}
             for i in range(len(df_type)):
                 r_name = str(df_type.iloc[i, 0]).strip()
                 if r_name in ['△', '※']:
-                    req_matrix[r_name] = [int(float(str(df_type.iloc[i, c]).strip() or 0)) for c in type_cols]
+                    req_matrix[r_name] = pd.to_numeric(df_type.iloc[i, 1:11], errors='coerce').fillna(0).astype(int).tolist()
 
             # --- 3. 精準識別一覽表班級列 ---
             assign_start_idx = -1
@@ -314,7 +314,6 @@ if st.button("🚀 啟動終極全自動排班系統", type="primary", use_conta
                             for c_i in range(1, len(clss)):
                                 if df_c.iloc[r, c_i]: course_dict[(clss[c_i], subj)] = clean_str(df_c.iloc[r, c_i])
                     
-                    # 建立一覽表全地圖 (包括手動填寫的 5/13)
                     date_row_idx = max(0, assign_periods_r - 1)
                     detected_month = "05"
                     for c in range(1, ws_assign.max_column + 1):
@@ -352,13 +351,11 @@ if st.button("🚀 啟動終極全自動排班系統", type="primary", use_conta
                         if not val_D: continue
                         cls, subj = clean_str(val_D), normalize_subject(val_E)
                         
-                        # 填寫任課教師
                         teacher = get_teacher_fuzzy(cls, subj, course_dict)
                         if teacher:
                             t_c = ws_label.cell(row=r, column=col_teacher)
                             if type(t_c).__name__ != 'MergedCell': t_c.value = teacher
                         
-                        # 填寫監考老師 (直讀直印同步)
                         try: p_val_str = str(int(float(val_A)))
                         except: p_val_str = ""
                         l_date = val_B.strftime('%m-%d') if isinstance(val_B, datetime) else extract_mm_dd(str(val_B), default_month=detected_month)
