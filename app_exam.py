@@ -12,8 +12,8 @@ from datetime import datetime
 # 1. 網頁頁面配置
 # ==========================================
 st.set_page_config(page_title="段考監考終極自動化", page_icon="🏫", layout="wide")
-st.title("🏫 試務組-段考監考全自動化系統 (防呆極致版)")
-st.info("💡 已完美修復：加入「Excel 幽靈空白行過濾」與「連堂空值防護」，徹底根除 KeyError: None 閃退問題！")
+st.title("🏫 試務組-全校監考全自動化系統")
+st.info("💡 已完美修復：加入「Excel 幽靈空白行過濾」與「連堂空值防護」，徹底根除 KeyError: None 閃退問題！115.05.16更新")
 
 # --- 初始化狀態 ---
 if 'results' not in st.session_state:
