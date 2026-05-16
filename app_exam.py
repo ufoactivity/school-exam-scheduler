@@ -13,7 +13,7 @@ from datetime import datetime
 # 1. 網頁頁面配置
 # ==========================================
 st.set_page_config(page_title="段考監考終極自動化", page_icon="🏫", layout="wide")
-st.title("🏫 試務組-段考監考全自動化系統 (終極完全體)")
+st.title("🏫 試務組-段考監考全自動化系統 1150516更新")
 st.info("💡 終極修復：已解除「監考類型總數」的雷達綁定，解決 index out of bounds 錯誤！現在系統能完美區分靜態數據與動態報表。")
 
 # --- 初始化狀態 ---
